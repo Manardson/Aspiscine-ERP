@@ -1,0 +1,94 @@
+version: "3.8"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: aspiscine-erp
+    container_name: aspiscine-erp-app
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./:/var/www
+      - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+    networks:
+      - aspiscine-network
+    depends_on:
+      - db
+      - redis
+
+  webserver:
+    image: nginx:alpine
+    container_name: aspiscine-erp-webserver
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    volumes:
+      - ./:/var/www
+      - ./docker/nginx/conf.d/:/etc/nginx/conf.d/
+    networks:
+      - aspiscine-network
+    depends_on:
+      - app
+
+  db:
+    image: mysql:8.0
+    container_name: aspiscine-erp-db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: aspiscine_erp
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_PASSWORD: user_password
+      MYSQL_USER: aspiscine_user
+      SERVICE_TAGS: dev
+      SERVICE_NAME: mysql
+    volumes:
+      - dbdata:/var/lib/mysql/
+      - ./docker/mysql/my.cnf:/etc/mysql/my.cnf
+    ports:
+      - "3306:3306"
+    networks:
+      - aspiscine-network
+
+  redis:
+    image: redis:alpine
+    container_name: aspiscine-erp-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - aspiscine-network
+
+  mailhog:
+    image: mailhog/mailhog
+    container_name: aspiscine-erp-mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - aspiscine-network
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: aspiscine-erp-phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+      PMA_ARBITRARY: 1
+    ports:
+      - "8080:80"
+    networks:
+      - aspiscine-network
+    depends_on:
+      - db
+
+networks:
+  aspiscine-network:
+    driver: bridge
+
+volumes:
+  dbdata:
+    driver: local

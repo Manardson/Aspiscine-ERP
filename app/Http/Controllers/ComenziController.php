@@ -139,27 +139,57 @@ class ComenziController extends Controller
 
                 if ($request->has('dpd') && $request->dpd == 1) {
 
-                    if($order->livrare_address_1!=''&& $order->livrare_address_2!='')
-                    {
-                        $dpd_awb = self::dpd_generare_awb($order, $order_item);
-                        
-                        $dpd_response=self::dpd_make_call($dpd_awb);
-                        
-                        if($dpd_response[1]==1)
-                        {
-                            $order->awb=$dpd_response[0];
-                            $order->curier="dpd";
-                        }
-                        else
-                        {
-                            return response($dpd_response[0]);
-                        }
-                        
+                    // Enhanced address validation with detailed logging
+                    $validation_errors = $this->validateDpdAddress($order);
 
-                    }
-                    else
-                    {
-                        return response('Metoda dpd curier, campurile adress_1 si adress_2 sunt obligatorii!');
+                    if (empty($validation_errors)) {
+                        \Log::info("DPD AWB Generation Started", [
+                            "order_id" => $order->id,
+                            "order_order_id" => $order->order_id,
+                            "address_1" => $order->livrare_address_1,
+                            "address_2" => $order->livrare_address_2,
+                            "city" => $order->city,
+                            "state" => $order->state,
+                            "timestamp" => now()
+                        ]);
+
+                        $dpd_awb = self::dpd_generare_awb($order, $order_item);
+
+                        if ($dpd_awb === false) {
+                            \Log::error("DPD AWB Generation Failed", [
+                                "order_id" => $order->id,
+                                "reason" => "City mapping failed",
+                                "timestamp" => now()
+                            ]);
+                            return response('Eroare la maparea orasului pentru DPD. Verificati datele de livrare.');
+                        }
+
+                        $dpd_response = self::dpd_make_call($dpd_awb);
+
+                        if ($dpd_response[1] == 1) {
+                            $order->awb = $dpd_response[0];
+                            $order->curier = "dpd";
+
+                            \Log::info("DPD AWB Generated Successfully", [
+                                "order_id" => $order->id,
+                                "awb" => $dpd_response[0],
+                                "timestamp" => now()
+                            ]);
+                        } else {
+                            \Log::error("DPD AWB Generation Failed", [
+                                "order_id" => $order->id,
+                                "error" => $dpd_response[0],
+                                "timestamp" => now()
+                            ]);
+                            return response('Eroare DPD: ' . $dpd_response[0]);
+                        }
+                    } else {
+                        \Log::warning("DPD Address Validation Failed", [
+                            "order_id" => $order->id,
+                            "validation_errors" => $validation_errors,
+                            "timestamp" => now()
+                        ]);
+                        return response('Eroare validare adresa DPD: ' . implode(', ', $validation_errors));
                     }
                    
                 } else {
@@ -389,24 +419,73 @@ class ComenziController extends Controller
         return $response;
     }
 
+    /**
+     * Validate DPD address data before sending to API.
+     *
+     * @param Order $order
+     * @return array
+     */
+    private function validateDpdAddress($order)
+    {
+        $errors = [];
+
+        if (empty(trim($order->livrare_address_1))) {
+            $errors[] = "Strada (address_1) este obligatorie";
+        }
+
+        if (empty(trim($order->livrare_address_2))) {
+            $errors[] = "Numarul strazii (address_2) este obligatoriu";
+        }
+
+        if (empty(trim($order->city))) {
+            $errors[] = "Orasul este obligatoriu";
+        }
+
+        if (empty(trim($order->state))) {
+            $errors[] = "Judetul este obligatoriu";
+        }
+
+        if (empty(trim($order->phone))) {
+            $errors[] = "Numarul de telefon este obligatoriu";
+        }
+
+        if (empty(trim($order->livrare_first_name)) && empty(trim($order->company))) {
+            $errors[] = "Numele destinatarului sau numele companiei este obligatoriu";
+        }
+
+        // Validate phone number format
+        if (!empty($order->phone) && !preg_match('/^[0-9+\-\s()]{10,15}$/', $order->phone)) {
+            $errors[] = "Formatul numarului de telefon este invalid";
+        }
+
+        return $errors;
+    }
+
     private function dpd_generare_awb($order, $order_item)
     {
-        $state_id=$this->get_cities($order->state,$order->city);
-        if($order->payment_method=="netopiapayments") 
-        {
-            $total=0 ;
-        }else 
-        {
-            $total=$order->total;
+        $state_id = $this->get_cities($order->state, $order->city);
+
+        // Return false if city mapping fails
+        if ($state_id === false) {
+            \Log::error("DPD City Mapping Failed", [
+                "order_id" => $order->id,
+                "state" => $order->state,
+                "city" => $order->city,
+                "timestamp" => now()
+            ]);
+            return false;
         }
-    
-        if($order->cif!='')
-        {
-            $client_name=$order->company;
+
+        if ($order->payment_method == "netopiapayments") {
+            $total = 0;
+        } else {
+            $total = $order->total;
         }
-        else
-        {
-            $client_name=$order->livrare_first_name . ' ' . $order->livrare_last_name;
+
+        if ($order->cif != '') {
+            $client_name = $order->company;
+        } else {
+            $client_name = trim($order->livrare_first_name . ' ' . $order->livrare_last_name);
         }
         $array = [
 
@@ -458,26 +537,105 @@ class ComenziController extends Controller
     private function dpd_make_call($array)
     {
         $base_url = "https://api.dpd.ro/v1/shipment";
+
+        // Log the request data for debugging
+        \Log::info("DPD API Request", [
+            "url" => $base_url,
+            "payload" => $array,
+            "timestamp" => now()
+        ]);
+
         $ch = curl_init($base_url);
-       
+
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($array));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type:application/json'));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array("Content-Type:application/json"));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30); // 30 second timeout
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // 10 second connection timeout
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+
         $response = curl_exec($ch);
-        $response=json_decode($response);
-        if(property_exists($response,'id'))
-        {
-            curl_close($ch);
-        return array($response->id,1);
+        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curl_error = curl_error($ch);
+
+        // Log raw response for debugging
+        \Log::info("DPD API Raw Response", [
+            "http_code" => $http_code,
+            "response" => $response,
+            "curl_error" => $curl_error,
+            "timestamp" => now()
+        ]);
+
+        curl_close($ch);
+
+        // Handle cURL errors
+        if ($curl_error) {
+            \Log::error("DPD API cURL Error", [
+                "error" => $curl_error,
+                "http_code" => $http_code,
+                "timestamp" => now()
+            ]);
+            return array("Connection error: " . $curl_error, 0);
         }
-        else
-        {
-            
-            return array($response->error->message,0);
+
+        // Handle HTTP errors
+        if ($http_code !== 200) {
+            \Log::error("DPD API HTTP Error", [
+                "http_code" => $http_code,
+                "response" => $response,
+                "timestamp" => now()
+            ]);
+            return array("HTTP Error: " . $http_code, 0);
         }
-        
-       
-        
+
+        // Handle empty response
+        if (empty($response)) {
+            \Log::error("DPD API Empty Response", [
+                "http_code" => $http_code,
+                "timestamp" => now()
+            ]);
+            return array("Empty response from DPD API", 0);
+        }
+
+        // Decode JSON response
+        $decoded_response = json_decode($response);
+
+        // Handle JSON decode errors
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            \Log::error("DPD API JSON Decode Error", [
+                "json_error" => json_last_error_msg(),
+                "response" => $response,
+                "timestamp" => now()
+            ]);
+            return array("Invalid JSON response from DPD API", 0);
+        }
+
+        // Handle successful response with AWB ID
+        if (property_exists($decoded_response, "id")) {
+            \Log::info("DPD API Success", [
+                "awb_id" => $decoded_response->id,
+                "timestamp" => now()
+            ]);
+            return array($decoded_response->id, 1);
+        }
+
+        // Handle error response
+        if (property_exists($decoded_response, "error") && property_exists($decoded_response->error, "message")) {
+            \Log::error("DPD API Business Error", [
+                "error_message" => $decoded_response->error->message,
+                "full_response" => $decoded_response,
+                "timestamp" => now()
+            ]);
+            return array($decoded_response->error->message, 0);
+        }
+
+        // Handle unexpected response format
+        \Log::error("DPD API Unexpected Response Format", [
+            "response" => $decoded_response,
+            "timestamp" => now()
+        ]);
+        return array("Unexpected response format from DPD API", 0);
     }
     private function create_csv($order)
     {
@@ -616,27 +774,86 @@ class ComenziController extends Controller
     //     curl_close($ch);
     //     return $response;
     // }
-    private function get_cities($judet,$city)
+    private function get_cities($judet, $city)
     {
-        $judete=file_get_contents('judete.txt');
-        $judete=explode(PHP_EOL,$judete);
+        try {
+            // Check if judete.txt file exists
+            if (!file_exists('judete.txt')) {
+                \Log::error("DPD Cities Mapping Error", [
+                    "error" => "judete.txt file not found",
+                    "judet" => $judet,
+                    "city" => $city,
+                    "timestamp" => now()
+                ]);
+                return false;
+            }
 
-        foreach($judete as $elem)
-        {
-            $a=explode(":",$elem);
-            $new_jud[$a[0]]=str_replace("\r","",$a[1]);
+            $judete = file_get_contents('judete.txt');
+            if ($judete === false) {
+                \Log::error("DPD Cities Mapping Error", [
+                    "error" => "Failed to read judete.txt file",
+                    "judet" => $judet,
+                    "city" => $city,
+                    "timestamp" => now()
+                ]);
+                return false;
+            }
+
+            $judete = explode(PHP_EOL, $judete);
+            $new_jud = [];
+
+            foreach ($judete as $elem) {
+                if (empty(trim($elem))) continue;
+
+                $a = explode(":", $elem);
+                if (count($a) >= 2) {
+                    $new_jud[$a[0]] = str_replace("\r", "", $a[1]);
+                }
+            }
+
+            if (array_key_exists($judet, $new_jud)) {
+                $cities = DB::table('cities')
+                    ->where('localitate', $city)
+                    ->where('judet', $new_jud[$judet])
+                    ->first();
+
+                if ($cities) {
+                    $a = explode(".", $cities->id);
+
+                    \Log::info("DPD City Mapping Success", [
+                        "judet" => $judet,
+                        "city" => $city,
+                        "mapped_judet" => $new_jud[$judet],
+                        "site_id" => $a[0],
+                        "timestamp" => now()
+                    ]);
+
+                    return $a[0];
+                } else {
+                    \Log::warning("DPD City Not Found", [
+                        "judet" => $judet,
+                        "city" => $city,
+                        "mapped_judet" => $new_jud[$judet],
+                        "timestamp" => now()
+                    ]);
+                }
+            } else {
+                \Log::warning("DPD County Not Found", [
+                    "judet" => $judet,
+                    "city" => $city,
+                    "available_counties" => array_keys($new_jud),
+                    "timestamp" => now()
+                ]);
+            }
+        } catch (\Exception $e) {
+            \Log::error("DPD Cities Mapping Exception", [
+                "error" => $e->getMessage(),
+                "judet" => $judet,
+                "city" => $city,
+                "timestamp" => now()
+            ]);
         }
 
-        if(array_key_exists($judet,$new_jud))
-        {
-            $cities=DB::table('cities')->where('localitate',$city)->where('judet',$new_jud[$judet])->first();
-           if($cities) 
-           {
-            $a=explode(".",$cities->id);
-            return $a[0];
-
-           }
-        }
         return false;
     }
 }
