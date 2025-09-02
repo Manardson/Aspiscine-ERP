@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Mentenanta</title>
+        <meta name="description" content="Cel mai utilizat program de facturare este acum in Cloud! Creeaza-ti acum cont gratuit si ai facturi, chitante, avize, proforme, rapoarte oricand, de oriunde.">
+
+        <link type="text/css" rel="stylesheet" href="/media/css/main.css?v=1">
+
+        <script type="text/javascript" src="/media/js/libs/jquery/jquery-3.3.1.min.js"></script>
+        <script type="text/javascript">
+            //usage:
+            $.ajax({
+                url: "/media/status.json",
+                dataType: 'json',
+                data: {},
+                success: function(response) {
+                    window.maintenanceStatus = response;
+                    window.showMaintenanceContent();
+                },
+                error: function() {
+                    window.maintenanceStatus = {
+                        issue: 1,
+                        mobile: 1,
+                    };
+                    window.showMaintenanceContent();
+                }
+            });
+        </script>
+        <script type="text/javascript" src="/media/js/main.js?v=1"></script>
+
+    </head>
+    <body>
+        <div class="stripes top"></div>
+        <div class="container-wrapper">
+
+            <div class="container-outer">
+                <img class="logo_cloud" src="https://s3.eu-central-1.amazonaws.com/sb-img1/cloud/logos/sb_fg_logo_fullcolor_230x57.png" alt="SmartBill" />
+
+                <div class="container">
+                    <div class="title">Rezolvam o problema tehnica!</div>
+                    <div class="important-text bold">Aplicatia SmartBill nu este disponibila momentan.</div>
+                    <div class="normal-text">Muncim intens sa rezolva situatia, iar serviciul va fi disponibil in curand.<br>
+                        Ne pare rau pentru intrerupere, intelegem ca poate fi frustrant si iti multumim pentru rabdare.</div>
+                </div>
+
+                <div class="eta"></div>
+                <div class="extra-info"></div>
+            </div>
+        </div>
+        <div class="stripes bottom"></div>
+    </body>
+</html>
