@@ -145,11 +145,11 @@ fi
 echo -e "${YELLOW}Stopping existing containers...${NC}"
 $COMPOSE_CMD down
 
-# # Remove composer.lock to force fresh resolution
-# if [ -f "composer.lock" ]; then
-#     rm -f composer.lock
-#     echo -e "${GREEN}✓ Removed composer.lock${NC}"
-# fi
+# Remove composer.lock to force fresh resolution
+if [ -f "composer.lock" ]; then
+    rm -f composer.lock
+    echo -e "${GREEN}✓ Removed composer.lock${NC}"
+fi
 
 # Build and start containers
 echo -e "${YELLOW}Building and starting containers...${NC}"

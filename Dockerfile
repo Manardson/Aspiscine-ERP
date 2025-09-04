@@ -45,6 +45,9 @@ RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local
 RUN groupadd -g 1000 www
 RUN useradd -u 1000 -ms /bin/bash -g www www
 
+# Copy your local packages first so Composer can find them.
+COPY local_packages /var/www/local_packages
+
 # Copy existing application directory contents
 COPY . /var/www
 
@@ -56,16 +59,12 @@ RUN mkdir -p /var/www/storage /var/www/bootstrap/cache
 
 RUN git config --global --add safe.directory /var/www
 
-# Update composer dependencies to resolve PHP 8.0 compatibility
-# First try to update to get compatible versions, then install
-# Use --disable-tls and --no-secure-http to handle SSL issues with larapack.io
-# RUN composer update --no-interaction --disable-tls --no-secure-http || \
-#     composer update --no-interaction --ignore-platform-reqs --disable-tls --no-secure-http || \
-#     composer install --no-interaction --disable-tls --no-secure-http || \
-#     composer install --no-interaction --ignore-platform-reqs --disable-tls --no-secure-http
-RUN composer config -g disable-tls true && \
+# 1. Clear cache to avoid issues.
+# 2. Use "install" which is faster and more reliable for builds if a lock file exists.
+RUN composer clear-cache && \
+    composer config -g disable-tls true && \
     composer config -g process-timeout 2000 && \
-    composer update --no-interaction --no-progress --no-scripts
+    composer install --no-interaction --no-progress --no-scripts
 
 # Set proper permissions after composer operations
 RUN chown -R www:www /var/www/storage
