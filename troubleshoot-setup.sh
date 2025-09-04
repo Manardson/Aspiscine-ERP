@@ -145,11 +145,11 @@ fi
 echo -e "${YELLOW}Stopping existing containers...${NC}"
 $COMPOSE_CMD down
 
-# Remove composer.lock to force fresh resolution
-if [ -f "composer.lock" ]; then
-    rm -f composer.lock
-    echo -e "${GREEN}✓ Removed composer.lock${NC}"
-fi
+# # Remove composer.lock to force fresh resolution
+# if [ -f "composer.lock" ]; then
+#     rm -f composer.lock
+#     echo -e "${GREEN}✓ Removed composer.lock${NC}"
+# fi
 
 # Build and start containers
 echo -e "${YELLOW}Building and starting containers...${NC}"
@@ -165,32 +165,51 @@ fi
 echo -e "${YELLOW}Waiting for containers to be ready...${NC}"
 sleep 10
 
-# Install/update composer dependencies
-echo -e "${YELLOW}Installing composer dependencies...${NC}"
-if $COMPOSE_CMD exec -T app composer install --no-interaction; then
-    echo -e "${GREEN}✓ Composer dependencies installed${NC}"
-else
-    echo -e "${YELLOW}⚠ Composer install failed, trying update...${NC}"
-    if $COMPOSE_CMD exec -T app composer update --no-interaction; then
-        echo -e "${GREEN}✓ Composer dependencies updated${NC}"
-    else
-        echo -e "${RED}✗ Composer operations failed${NC}"
-        echo -e "${YELLOW}This might be due to network issues or dependency conflicts${NC}"
+# Wait for MySQL to be ready
+echo -e "${YELLOW}Waiting for MySQL to be ready...${NC}"
+max_attempts=30
+attempt=0
+while [ $attempt -lt $max_attempts ]; do
+    attempt=$((attempt + 1))
+    sleep 2
+    if docker compose exec -T db mysqladmin ping -h localhost -u root -proot_password &> /dev/null; then
+        echo -e "${GREEN}✓ MySQL is ready${NC}"
+        break
     fi
+    echo -e "${YELLOW}Waiting for MySQL... ($attempt/$max_attempts)${NC}"
+done
+
+if [ $attempt -eq $max_attempts ]; then
+    echo -e "${RED}✗ MySQL failed to start within timeout${NC}"
+    exit 1
 fi
 
-# Generate application key
-echo -e "${YELLOW}Generating application key...${NC}"
-$COMPOSE_CMD exec -T app php artisan key:generate --force
-echo -e "${GREEN}✓ Application key generated${NC}"
+# Install/update composer dependencies
+# echo -e "${YELLOW}Installing composer dependencies...${NC}"
+# if $COMPOSE_CMD exec -T app composer install --no-interaction; then
+#     echo -e "${GREEN}✓ Composer dependencies installed${NC}"
+# else
+#     echo -e "${YELLOW}⚠ Composer install failed, trying update...${NC}"
+#     if $COMPOSE_CMD exec -T app composer update --no-interaction; then
+#         echo -e "${GREEN}✓ Composer dependencies updated${NC}"
+#     else
+#         echo -e "${RED}✗ Composer operations failed${NC}"
+#         echo -e "${YELLOW}This might be due to network issues or dependency conflicts${NC}"
+#     fi
+# fi
+
+# # Generate application key
+# echo -e "${YELLOW}Generating application key...${NC}"
+# $COMPOSE_CMD exec -T app php artisan key:generate --force
+# echo -e "${GREEN}✓ Application key generated${NC}"
 
 # Set permissions
-echo -e "${YELLOW}Setting file permissions...${NC}"
-$COMPOSE_CMD exec -T app chown -R www:www /var/www/storage
-$COMPOSE_CMD exec -T app chown -R www:www /var/www/bootstrap/cache
-$COMPOSE_CMD exec -T app chmod -R 775 /var/www/storage
-$COMPOSE_CMD exec -T app chmod -R 775 /var/www/bootstrap/cache
-echo -e "${GREEN}✓ File permissions set${NC}"
+# echo -e "${YELLOW}Setting file permissions...${NC}"
+# $COMPOSE_CMD exec -T app chown -R www:www /var/www/storage
+# $COMPOSE_CMD exec -T app chown -R www:www /var/www/bootstrap/cache
+# $COMPOSE_CMD exec -T app chmod -R 775 /var/www/storage
+# $COMPOSE_CMD exec -T app chmod -R 775 /var/www/bootstrap/cache
+# echo -e "${GREEN}✓ File permissions set${NC}"
 
 # Clear caches
 echo -e "${YELLOW}Clearing application caches...${NC}"
@@ -198,6 +217,28 @@ $COMPOSE_CMD exec -T app php artisan config:clear
 $COMPOSE_CMD exec -T app php artisan cache:clear
 $COMPOSE_CMD exec -T app php artisan view:clear
 echo -e "${GREEN}✓ Caches cleared${NC}"
+
+# Run database migrations
+echo -e "${YELLOW}Running database migrations...${NC}"
+if docker compose exec -T app php artisan migrate --force; then
+    echo -e "${GREEN}✓ Database migrations completed${NC}"
+else
+    echo -e "${YELLOW}⚠ Database migrations failed (this might be expected if tables already exist)${NC}"
+fi
+
+# Run tests to verify DPD integration
+echo -e "${YELLOW}Running DPD integration tests...${NC}"
+if docker compose exec -T app php artisan test tests/Unit/DpdAddressTransformationTest.php --stop-on-failure; then
+    echo -e "${GREEN}✓ DPD Address Transformation tests passed${NC}"
+else
+    echo -e "${YELLOW}⚠ DPD Address Transformation tests failed${NC}"
+fi
+
+if docker compose exec -T app php artisan test tests/Unit/DpdAwbResponseTest.php --stop-on-failure; then
+    echo -e "${GREEN}✓ DPD AWB Response tests passed${NC}"
+else
+    echo -e "${YELLOW}⚠ DPD AWB Response tests failed${NC}"
+fi
 
 echo ""
 echo -e "${GREEN}=== Setup Complete ===${NC}"
@@ -207,11 +248,17 @@ echo -e "${WHITE}• Application: http://localhost:8000${NC}"
 echo -e "${WHITE}• PhpMyAdmin: http://localhost:8080${NC}"
 echo -e "${WHITE}• MailHog: http://localhost:8025${NC}"
 echo ""
-echo -e "${CYAN}Next steps:${NC}"
-echo -e "${WHITE}1. Run migrations: $COMPOSE_CMD exec app php artisan migrate${NC}"
-echo -e "${WHITE}2. Check logs: $COMPOSE_CMD logs -f app${NC}"
-echo -e "${WHITE}3. Access container: $COMPOSE_CMD exec app bash${NC}"
+echo -e "${CYAN}Database credentials:${NC}"
+echo -e "${WHITE}• Database: aspiscine_erp${NC}"
+echo -e "${WHITE}• Username: aspiscine_user${NC}"
+echo -e "${WHITE}• Password: user_password${NC}"
 echo ""
 echo -e "${CYAN}Container root access:${NC}"
 echo -e "${WHITE}• Access container as root: $COMPOSE_CMD exec --user root app bash${NC}"
 echo -e "${WHITE}• The root password inside container is: root${NC}"
+echo ""
+echo -e "${CYAN}DPD Integration:${NC}"
+echo -e "${WHITE}• Enhanced error handling and logging implemented${NC}"
+echo -e "${WHITE}• Address validation added${NC}"
+echo -e "${WHITE}• Comprehensive unit tests created${NC}"
+echo -e "${WHITE}• Check logs for DPD operations: docker compose logs app | grep DPD${NC}"

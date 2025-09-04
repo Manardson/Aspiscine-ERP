@@ -65,7 +65,7 @@ RUN git config --global --add safe.directory /var/www
 #     composer install --no-interaction --ignore-platform-reqs --disable-tls --no-secure-http
 RUN composer config -g disable-tls true && \
     composer config -g process-timeout 2000 && \
-    composer install --no-interaction --no-progress --no-scripts
+    composer update --no-interaction --no-progress --no-scripts
 
 # Set proper permissions after composer operations
 RUN chown -R www:www /var/www/storage
