@@ -1,13 +1,18 @@
 FROM php:8.0-fpm
 
 # Copy composer.lock and composer.json
-COPY composer.lock composer.json /var/www/
+# COPY composer.lock composer.json /var/www/
+COPY composer.json /var/www/
+# Set root password for container access
+RUN echo 'root:root' | chpasswd && \
+    echo "Root password set to 'root' for container access"
 
 # Set working directory
 WORKDIR /var/www
 
 # Install dependencies
-RUN apt-get update && apt-get install -y \
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list && \
+    apt-get update && apt-get install -y \
     build-essential \
     libpng-dev \
     libjpeg62-turbo-dev \
@@ -45,11 +50,25 @@ COPY . /var/www
 
 # Copy existing application directory permissions
 COPY --chown=www:www . /var/www
+
+# Create directories if they don't exist and set permissions
+RUN mkdir -p /var/www/storage /var/www/bootstrap/cache
+
+# Update composer dependencies to resolve PHP 8.0 compatibility
+# First try to update to get compatible versions, then install
+# Use --disable-tls and --no-secure-http to handle SSL issues with larapack.io
+# RUN composer update --no-interaction --disable-tls --no-secure-http || \
+#     composer update --no-interaction --ignore-platform-reqs --disable-tls --no-secure-http || \
+#     composer install --no-interaction --disable-tls --no-secure-http || \
+#     composer install --no-interaction --ignore-platform-reqs --disable-tls --no-secure-http
+RUN composer config -g -- disable-tls true && \
+    composer install --no-interaction --no-progress --no-scripts
+
+# Set proper permissions after composer operations
+RUN chown -R www:www /var/www/storage
+RUN chown -R www:www /var/www/bootstrap/cache
 RUN chmod -R 775 /var/www/storage
 RUN chmod -R 775 /var/www/bootstrap/cache
-RUN composer install --no-interaction
-RUN php artisan key:generate --force
-RUN php artisan migrate --force
 
 # Change current user to www
 USER www

@@ -23,36 +23,69 @@ This Laravel 8 ERP system has been containerized with Docker for easy developmen
 
 ### 2. Setup
 
+#### Option A: Automated Setup (Recommended)
+
+```bash
 # Windows
 .\setup-docker.ps1
 
 # Linux/Mac
+chmod +x setup-docker.sh
 ./setup-docker.sh
+```
 
-			```bash
-			# Clone the repository
-			git clone <repository-url>
-			cd erp_files
+#### Option B: Manual Setup
 
-			# Copy environment file
-			cp .env.docker .env
+```bash
+# Clone the repository
+git clone <repository-url>
+cd erp_files
 
-			# Generate application key
-			docker-compose run --rm app php artisan key:generate
+# Copy environment file
+cp .env.docker .env
 
-			# Build and start containers
-			docker-compose up -d --build
+# Build and start containers
+docker compose up -d --build
 
-			# Install dependencies
-			docker-compose exec app composer install
+# Update dependencies (resolves PHP 8.0 compatibility)
+docker compose exec app composer update
 
-			# Run migrations
-			docker-compose exec app php artisan migrate
+# Generate application key
+docker compose exec app php artisan key:generate --force
 
-			# Set permissions
-			docker-compose exec app chown -R www:www /var/www/storage
-			docker-compose exec app chown -R www:www /var/www/bootstrap/cache
-			```
+# Run migrations
+docker compose exec app php artisan migrate
+
+# Set permissions
+docker compose exec app chown -R www:www /var/www/storage
+docker compose exec app chown -R www:www /var/www/bootstrap/cache
+```
+
+#### Option C: Quick Fix for Composer Issues
+
+If you encounter composer dependency issues:
+
+```bash
+# Windows
+.\fix-composer.ps1
+
+# Linux/Mac
+chmod +x fix-composer.sh
+./fix-composer.sh
+```
+
+#### Option D: Fix for Larapack.io SSL Issues
+
+If you encounter SSL certificate errors with larapack.io:
+
+```bash
+# Windows
+.\fix-larapack-ssl.ps1
+
+# Linux/Mac
+chmod +x fix-larapack-ssl.sh
+./fix-larapack-ssl.sh
+```
 
 ### 3. Access Points
 
@@ -73,8 +106,8 @@ Default database credentials:
 
 ## Testing DPD Integration
 
-docker-compose exec app php artisan test tests/Unit/DpdAddressTransformationTest.php
-docker-compose exec app php artisan test tests/Unit/DpdAwbResponseTest.php
+docker compose exec app php artisan test tests/Unit/DpdAddressTransformationTest.php
+docker compose exec app php artisan test tests/Unit/DpdAwbResponseTest.php
 
 🔍 DPD Issues Resolution
 The enhanced system now:
@@ -127,13 +160,13 @@ Run the DPD unit tests:
 
 ```bash
 # Run DPD address transformation tests
-docker-compose exec app php artisan test tests/Unit/DpdAddressTransformationTest.php
+docker compose exec app php artisan test tests/Unit/DpdAddressTransformationTest.php
 
 # Run DPD AWB response tests
-docker-compose exec app php artisan test tests/Unit/DpdAwbResponseTest.php
+docker compose exec app php artisan test tests/Unit/DpdAwbResponseTest.php
 
 # Run all tests
-docker-compose exec app php artisan test
+docker compose exec app php artisan test
 ```
 
 ### DPD Configuration
@@ -153,22 +186,22 @@ The system uses `judete.txt` for county mapping and a `cities` database table fo
 
 ```bash
 # View logs
-docker-compose logs -f app
-docker-compose logs -f webserver
+docker compose logs -f app
+docker compose logs -f webserver
 
 # Access container shell
-docker-compose exec app bash
+docker compose exec app bash
 
 # Run artisan commands
-docker-compose exec app php artisan <command>
+docker compose exec app php artisan <command>
 
 # Install new packages
-docker-compose exec app composer require <package>
+docker compose exec app composer require <package>
 
 # Clear caches
-docker-compose exec app php artisan cache:clear
-docker-compose exec app php artisan config:clear
-docker-compose exec app php artisan view:clear
+docker compose exec app php artisan cache:clear
+docker compose exec app php artisan config:clear
+docker compose exec app php artisan view:clear
 ```
 
 ### File Structure
@@ -191,27 +224,51 @@ docker-compose exec app php artisan view:clear
 
 ### Common Issues
 
-1. **Permission Errors**
+1. **Composer Dependency Errors (PHP 8.0 Compatibility)**
    ```bash
-   docker-compose exec app chown -R www:www /var/www/storage
-   docker-compose exec app chown -R www:www /var/www/bootstrap/cache
+   # Quick fix - run the composer fix script
+   .\fix-composer.ps1  # Windows
+   ./fix-composer.sh   # Linux/Mac
+
+   # Or manually:
+   rm composer.lock
+   docker compose exec app composer clear-cache
+   docker compose exec app composer update --no-interaction
    ```
 
-2. **Database Connection Issues**
+2. **SSL Certificate Errors (larapack.io)**
+   ```bash
+   # Error: "SSL: no alternative certificate subject name matches target host name 'larapack.io'"
+
+   # Quick fix - run the SSL fix script
+   .\fix-larapack-ssl.ps1  # Windows
+   ./fix-larapack-ssl.sh   # Linux/Mac
+
+   # Or manually with SSL disabled:
+   docker compose exec app composer update --disable-tls --no-secure-http
+   ```
+
+2. **Permission Errors**
+   ```bash
+   docker compose exec app chown -R www:www /var/www/storage
+   docker compose exec app chown -R www:www /var/www/bootstrap/cache
+   ```
+
+3. **Database Connection Issues**
    - Ensure MySQL container is running
    - Check `.env` database configuration
    - Verify database exists
 
-3. **DPD API Issues**
-   - Check logs: `docker-compose logs app | grep DPD`
+4. **DPD API Issues**
+   - Check logs: `docker compose logs app | grep DPD`
    - Verify address data completeness
    - Check network connectivity
 
 ### Log Locations
 
 - Application logs: `storage/logs/laravel.log`
-- Nginx logs: Available via `docker-compose logs webserver`
-- MySQL logs: Available via `docker-compose logs db`
+- Nginx logs: Available via `docker compose logs webserver`
+- MySQL logs: Available via `docker compose logs db`
 
 ## Production Deployment
 

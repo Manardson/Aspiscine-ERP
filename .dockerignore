@@ -1,0 +1,55 @@
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Documentation
+README.md
+README-DOCKER.md
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+storage/logs/*
+
+# Cache
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+bootstrap/cache/*
+
+# Dependencies
+node_modules
+vendor
+
+# Environment
+.env
+.env.*
+
+# Testing
+.phpunit.result.cache
+coverage
+
+# Build artifacts
+public/hot
+public/storage
+public/css
+public/js
+public/mix-manifest.json
+
+# Temporary files
+*.tmp
+*.temp

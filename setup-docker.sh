@@ -68,12 +68,22 @@ if [ $attempt -eq $max_attempts ]; then
     exit 1
 fi
 
-# Install Composer dependencies
-echo -e "${YELLOW}Installing Composer dependencies...${NC}"
-if docker compose exec -T app composer install --no-interaction; then
-    echo -e "${GREEN}✓ Composer dependencies installed${NC}"
+# Update and install Composer dependencies
+echo -e "${YELLOW}Updating and installing Composer dependencies...${NC}"
+if docker compose exec -T app composer update --no-interaction --disable-tls --no-secure-http; then
+    echo -e "${GREEN}✓ Composer dependencies updated and installed${NC}"
 else
-    echo -e "${RED}✗ Failed to install Composer dependencies${NC}"
+    echo -e "${YELLOW}⚠ Composer update failed, trying with relaxed security...${NC}"
+    if docker compose exec -T app composer update --no-interaction --ignore-platform-reqs --disable-tls --no-secure-http; then
+        echo -e "${GREEN}✓ Composer dependencies updated with relaxed security${NC}"
+    else
+        echo -e "${YELLOW}⚠ Update failed, trying install...${NC}"
+        if docker compose exec -T app composer install --no-interaction --disable-tls --no-secure-http; then
+            echo -e "${GREEN}✓ Composer dependencies installed${NC}"
+        else
+            echo -e "${RED}✗ Failed to install Composer dependencies${NC}"
+        fi
+    fi
 fi
 
 # Generate application key
