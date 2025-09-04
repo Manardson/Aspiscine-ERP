@@ -32,8 +32,8 @@ storage/framework/views/*
 bootstrap/cache/*
 
 # Dependencies
-node_modules
-vendor
+node_modules/
+vendor/
 
 # Environment
 .env

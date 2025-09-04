@@ -54,6 +54,8 @@ COPY --chown=www:www . /var/www
 # Create directories if they don't exist and set permissions
 RUN mkdir -p /var/www/storage /var/www/bootstrap/cache
 
+RUN git config --global --add safe.directory /var/www
+
 # Update composer dependencies to resolve PHP 8.0 compatibility
 # First try to update to get compatible versions, then install
 # Use --disable-tls and --no-secure-http to handle SSL issues with larapack.io
@@ -61,7 +63,8 @@ RUN mkdir -p /var/www/storage /var/www/bootstrap/cache
 #     composer update --no-interaction --ignore-platform-reqs --disable-tls --no-secure-http || \
 #     composer install --no-interaction --disable-tls --no-secure-http || \
 #     composer install --no-interaction --ignore-platform-reqs --disable-tls --no-secure-http
-RUN composer config -g -- disable-tls true && \
+RUN composer config -g disable-tls true && \
+    composer config -g process-timeout 2000 && \
     composer install --no-interaction --no-progress --no-scripts
 
 # Set proper permissions after composer operations
