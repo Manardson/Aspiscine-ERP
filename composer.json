@@ -23,7 +23,7 @@
     "repositories": [
         {
             "type": "path",
-            "url": "local_packages/larapack"
+            "url": "local_packages/larapack/*"
         }
     ],
 
