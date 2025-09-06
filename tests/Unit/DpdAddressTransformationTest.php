@@ -155,6 +155,7 @@ class DpdAddressTransformationTest extends TestCase
         $order = Order::factory()->create([
             "livrare_address_1" => "",
             "livrare_address_2" => "123",
+            "phone" => "0721234567",
             "nr_colete" => 1,
             "status" => 0
         ]);

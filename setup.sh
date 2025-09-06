@@ -227,6 +227,18 @@ echo -e "${GREEN}✓ Caches cleared${NC}"
 #     echo -e "${YELLOW}⚠ Database migrations failed (this might be expected if tables already exist)${NC}"
 # fi
 
+# Set up test database
+echo -e "${YELLOW}Setting up test database...${NC}"
+$COMPOSE_CMD exec -T db mysql -u root -proot_password -e "DROP DATABASE IF EXISTS aspiscine_erp_test;" 2>/dev/null
+$COMPOSE_CMD exec -T db mysql -u root -proot_password -e "CREATE DATABASE aspiscine_erp_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" 2>/dev/null
+$COMPOSE_CMD exec -T db mysql -u root -proot_password -e "GRANT ALL PRIVILEGES ON aspiscine_erp_test.* TO 'aspiscine_user'@'%';" 2>/dev/null
+$COMPOSE_CMD exec -T db mysql -u root -proot_password -e "FLUSH PRIVILEGES;" 2>/dev/null
+
+# Copy database structure from production to test
+echo -e "${YELLOW}Copying database structure to test database...${NC}"
+$COMPOSE_CMD exec -T db mysqldump -u root -proot_password --no-data --routines --triggers aspiscine_erp 2>/dev/null | $COMPOSE_CMD exec -T db mysql -u root -proot_password aspiscine_erp_test 2>/dev/null
+echo -e "${GREEN}✓ Test database setup complete${NC}"
+
 # Run tests to verify DPD integration
 echo -e "${YELLOW}Running DPD integration tests...${NC}"
 if docker compose exec -T app php artisan test tests/Unit/DpdAddressTransformationTest.php --stop-on-failure; then
