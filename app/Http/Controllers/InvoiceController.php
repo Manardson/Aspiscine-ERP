@@ -102,11 +102,11 @@ class InvoiceController extends Controller
 
     public function update_produse()
     {
-        if (isset($_GET['username']) && isset($_GET['password']) && $_GET['username'] == "smartbill_aspicine_api" && $_GET['password'] = "aspicinesmartbillapi" && isset($_GET['to']) && isset($_GET['from'])) {
+        if (isset($_GET['username']) && isset($_GET['password']) && $_GET['username'] == "smartbill_aspicine_api" && $_GET['password'] == "aspicinesmartbillapi" && isset($_GET['to']) && isset($_GET['from'])) {
 
             set_time_limit(6000);
 
-            
+
             $username = 'alenasimona@yahoo.com';
             $token    = '002|251393c9ee8631ac1576b68ba874b3de';
             $sbcClient = new SmartBillCloudRestClient($username, $token);
@@ -114,7 +114,12 @@ class InvoiceController extends Controller
             $data['warehouseName'] = 'Retail';
             $data['date'] = date('Y-m-d');
             $output = $sbcClient->productsStock($data);
-              
+
+            // Validate the output structure
+            if (!is_array($output) || !isset($output[0]['products']) || !is_array($output[0]['products'])) {
+                return response('Error: Invalid products data structure', 500);
+            }
+
             $data = array(
                 'username' => 'smartbill_aspicine_api',
                 'password' => 'aspicinesmartbillapi',
@@ -123,40 +128,46 @@ class InvoiceController extends Controller
                 'value' => ''
             );
             $nr = 0;
-            $array=$output[0]['products'];
-            
-            if($_GET['from']>=count($array))
-            {
-                $from=count($array)-1;
+            $array = $output[0]['products'];
+
+            // Validate and sanitize input parameters
+            $from = (int)$_GET['from'];
+            $to = (int)$_GET['to'];
+            $arrayCount = count($array);
+
+            if ($from >= $arrayCount) {
+                $from = $arrayCount - 1;
             }
-            else
-            {
-                $from=$_GET['from'];
+            if ($to >= $arrayCount) {
+                $to = $arrayCount - 1;
             }
-            if($_GET['to']>=count($array))
-            {
-                $to=count($array)-1;
+
+            // Ensure proper loop bounds - swap if needed
+            if ($to > $from) {
+                $temp = $to;
+                $to = $from;
+                $from = $temp;
             }
-            else
-            {
-                $to=$_GET['to'];
-            }
-            for($i=$to;$i<=$from;$i++)
-            {
-              
+
+            for ($i = $to; $i <= $from; $i++) {
+                if (!isset($array[$i]['productCode']) || !isset($array[$i]['quantity'])) {
+                    continue; // Skip invalid entries
+                }
+
                 $data['cod_produs'] = $array[$i]['productCode'];
                 $data['value'] = $array[$i]['quantity'];
 
                 $response = self::curl_call($data);
                 echo $response['messages'] . '<br>';
-                
+
                 usleep(500);
-                if($response['status']==1)
+                if ($response['status'] == 1) {
                     $nr++;
+                }
             }
             $headers[] = 'MIME-Version: 1.0';
             $headers[] = 'Content-type: text/html; charset=iso-8859-1';
-            mail("webmaster@aspiscine.ro", 'Update Aspiscine', 'Update executat cu success.S-a actualizat' . $nr . ' produse. De la  indicele '. $_GET['to'] .' pana la indicele' . $_GET['from']);
+            mail("webmaster@aspiscine.ro", 'Update Aspiscine', 'Update executat cu success.S-a actualizat ' . $nr . ' produse. De la indicele ' . $to . ' pana la indicele ' . $from);
             return response('Success');
         }
 
