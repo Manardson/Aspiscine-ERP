@@ -4,6 +4,8 @@ type: "always_apply"
 
 Remember:
 
+Try to make as few changes as possible. Test every theory in 2 or 3 ways.
+
 For running commands or tests I have a docker so use the docker compose command (instead of whoami put the test command):
 
 docker compose exec --user root django whoami

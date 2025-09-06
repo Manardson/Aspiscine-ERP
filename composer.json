@@ -20,12 +20,7 @@
         "tcg/voyager": "^1.4"
     },
 
-    "repositories": [
-        {
-            "type": "path",
-            "url": "local_packages/larapack/*"
-        }
-    ],
+
 
     "require-dev": {
         "facade/ignition": "^2.5",
