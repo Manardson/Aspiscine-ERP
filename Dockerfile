@@ -1,16 +1,16 @@
 FROM php:8.0-fpm
 
-# Copy composer.lock and composer.json
-# COPY composer.lock composer.json /var/www/
-COPY composer.json /var/www/
-# Set root password for container access
-RUN echo 'root:root' | chpasswd && \
-    echo "Root password set to 'root' for container access"
-
 # Set working directory
 WORKDIR /var/www
 
-# Install dependencies
+# --- Part 1: Install System Environment & Tools ---
+# These layers are stable and will rarely be rebuilt.
+
+# Set root password for container access (your custom setting)
+RUN echo 'root:root' | chpasswd && \
+    echo "Root password set to 'root' for container access"
+
+# Install system dependencies (your custom list and mirror)
 RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list && \
     apt-get update && apt-get install -y \
     build-essential \
@@ -28,12 +28,10 @@ RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list && \
     libonig-dev \
     libxml2-dev \
     nodejs \
-    npm
+    npm \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Clear cache
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Install extensions
+# Install PHP extensions (your custom list)
 RUN docker-php-ext-install pdo_mysql mbstring zip exif pcntl
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg
 RUN docker-php-ext-install gd
@@ -41,40 +39,38 @@ RUN docker-php-ext-install gd
 # Install composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
-# Add user for laravel application
+# Create the application user
 RUN groupadd -g 1000 www
 RUN useradd -u 1000 -ms /bin/bash -g www www
 
-# Copy your local packages first so Composer can find them.
-COPY local_packages /var/www/local_packages
+# --- Part 2: Install Composer Dependencies ---
+# This layer is only rebuilt when your dependencies change.
 
-# Copy existing application directory contents
-COPY . /var/www
+# Copy only the files needed for 'composer install'
+COPY composer.json composer.lock* ./
+COPY local_packages ./local_packages
 
-# Copy existing application directory permissions
-COPY --chown=www:www . /var/www
-
-# Create directories if they don't exist and set permissions
-RUN mkdir -p /var/www/storage /var/www/bootstrap/cache
-
-RUN git config --global --add safe.directory /var/www
-
-# 1. Clear cache to avoid issues.
-# 2. Use "install" which is faster and more reliable for builds if a lock file exists.
-RUN composer clear-cache && \
+# Fix "dubious ownership" warning and run install
+RUN git config --global --add safe.directory /var/www && \
+    composer clear-cache && \
     composer config -g disable-tls true && \
     composer config -g process-timeout 2000 && \
     composer install --no-interaction --no-progress --no-scripts
 
-# Set proper permissions after composer operations
-RUN chown -R www:www /var/www/storage
-RUN chown -R www:www /var/www/bootstrap/cache
-RUN chmod -R 775 /var/www/storage
-RUN chmod -R 775 /var/www/bootstrap/cache
+# --- Part 3: Copy Application Code & Set Permissions ---
+# This is the final, most frequently rebuilt layer.
 
-# Change current user to www
+# Copy the rest of your application code
+COPY . .
+
+# Set correct ownership for the entire application.
+# Must run as root to have permission to chown.
+USER root
+RUN chown -R www:www /var/www
+
+# Switch back to the non-root user for security
 USER www
 
-# Expose port 9000 and start php-fpm server
+# Expose port and start the server
 EXPOSE 9000
 CMD ["php-fpm"]

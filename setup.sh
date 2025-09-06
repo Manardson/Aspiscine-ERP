@@ -198,18 +198,19 @@ fi
 #     fi
 # fi
 
-# # Generate application key
-# echo -e "${YELLOW}Generating application key...${NC}"
-# $COMPOSE_CMD exec -T app php artisan key:generate --force
-# echo -e "${GREEN}✓ Application key generated${NC}"
+# Generate application key
+echo -e "${YELLOW}Generating application key...${NC}"
+$COMPOSE_CMD exec -T app php artisan key:generate --force
+echo -e "${GREEN}✓ Application key generated${NC}"
 
-# Set permissions
-# echo -e "${YELLOW}Setting file permissions...${NC}"
-# $COMPOSE_CMD exec -T app chown -R www:www /var/www/storage
-# $COMPOSE_CMD exec -T app chown -R www:www /var/www/bootstrap/cache
-# $COMPOSE_CMD exec -T app chmod -R 775 /var/www/storage
-# $COMPOSE_CMD exec -T app chmod -R 775 /var/www/bootstrap/cache
-# echo -e "${GREEN}✓ File permissions set${NC}"
+Set permissions
+echo -e "${YELLOW}Setting file permissions...${NC}"
+$COMPOSE_CMD exec -T --user root app chown -R www:www /var/www/vendor
+$COMPOSE_CMD exec -T --user root app chown -R www:www /var/www/storage
+$COMPOSE_CMD exec -T --user root app chown -R www:www /var/www/bootstrap/cache
+$COMPOSE_CMD exec -T --user root app chmod -R 775 /var/www/storage
+$COMPOSE_CMD exec -T --user root app chmod -R 775 /var/www/bootstrap/cache
+echo -e "${GREEN}✓ File permissions set${NC}"
 
 # Clear caches
 echo -e "${YELLOW}Clearing application caches...${NC}"
