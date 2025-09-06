@@ -220,12 +220,12 @@ $COMPOSE_CMD exec -T app php artisan view:clear
 echo -e "${GREEN}✓ Caches cleared${NC}"
 
 # Run database migrations
-echo -e "${YELLOW}Running database migrations...${NC}"
-if docker compose exec -T app php artisan migrate --force; then
-    echo -e "${GREEN}✓ Database migrations completed${NC}"
-else
-    echo -e "${YELLOW}⚠ Database migrations failed (this might be expected if tables already exist)${NC}"
-fi
+# echo -e "${YELLOW}Running database migrations...${NC}"
+# if docker compose exec -T app php artisan migrate --force; then
+#     echo -e "${GREEN}✓ Database migrations completed${NC}"
+# else
+#     echo -e "${YELLOW}⚠ Database migrations failed (this might be expected if tables already exist)${NC}"
+# fi
 
 # Run tests to verify DPD integration
 echo -e "${YELLOW}Running DPD integration tests...${NC}"
