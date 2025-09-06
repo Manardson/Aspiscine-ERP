@@ -47,19 +47,23 @@ class DpdAddressTransformationTest extends TestCase
 
         $orderItems = collect([]);
 
-        // Use reflection to access private method
-        $reflection = new \ReflectionClass($this->controller);
-        $method = $reflection->getMethod("dpd_generare_awb");
-        $method->setAccessible(true);
+        // Mock the get_cities method to return a valid city ID
+        $controller = Mockery::mock(ComenziController::class)->makePartial()->shouldAllowMockingProtectedMethods();
+        $controller->shouldReceive('get_cities')
+                  ->with('B', 'Bucuresti')
+                  ->andReturn('1');
 
-        $result = $method->invoke($this->controller, $order, $orderItems);
+        $result = $controller->dpd_generare_awb($order, $orderItems);
+
+        // Assert the result is not false (city mapping succeeded)
+        $this->assertNotFalse($result);
 
         // Assert the structure is correct
         $this->assertArrayHasKey("userName", $result);
         $this->assertArrayHasKey("password", $result);
         $this->assertArrayHasKey("recipient", $result);
         $this->assertArrayHasKey("address", $result["recipient"]);
-        
+
         // Assert address fields are properly set
         $this->assertEquals("Strada Victoriei", $result["recipient"]["address"]["streetName"]);
         $this->assertEquals("123", $result["recipient"]["address"]["streetNo"]);
@@ -91,11 +95,13 @@ class DpdAddressTransformationTest extends TestCase
 
         $orderItems = collect([]);
 
-        $reflection = new \ReflectionClass($this->controller);
-        $method = $reflection->getMethod("dpd_generare_awb");
-        $method->setAccessible(true);
+        // Mock the get_cities method to return a valid city ID
+        $controller = Mockery::mock(ComenziController::class)->makePartial()->shouldAllowMockingProtectedMethods();
+        $controller->shouldReceive('get_cities')
+                  ->with('B', 'Bucuresti')
+                  ->andReturn('1');
 
-        $result = $method->invoke($this->controller, $order, $orderItems);
+        $result = $controller->dpd_generare_awb($order, $orderItems);
 
         // Assert that empty street name is passed to DPD
         $this->assertEquals("", $result["recipient"]["address"]["streetName"]);
@@ -126,11 +132,13 @@ class DpdAddressTransformationTest extends TestCase
 
         $orderItems = collect([]);
 
-        $reflection = new \ReflectionClass($this->controller);
-        $method = $reflection->getMethod("dpd_generare_awb");
-        $method->setAccessible(true);
+        // Mock the get_cities method to return a valid city ID
+        $controller = Mockery::mock(ComenziController::class)->makePartial()->shouldAllowMockingProtectedMethods();
+        $controller->shouldReceive('get_cities')
+                  ->with('B', 'Bucuresti')
+                  ->andReturn('1');
 
-        $result = $method->invoke($this->controller, $order, $orderItems);
+        $result = $controller->dpd_generare_awb($order, $orderItems);
 
         // Assert that empty street number is passed to DPD
         $this->assertEquals("Strada Victoriei", $result["recipient"]["address"]["streetName"]);
@@ -160,7 +168,7 @@ class DpdAddressTransformationTest extends TestCase
         $response = $this->controller->genereaza_factura_awb($request);
 
         // Should return error message for missing address_1
-        $this->assertEquals("Metoda dpd curier, campurile adress_1 si adress_2 sunt obligatorii!", $response->getContent());
+        $this->assertEquals("Eroare validare adresa DPD: Strada (address_1) este obligatorie", $response->getContent());
     }
 
     /**
@@ -226,11 +234,13 @@ class DpdAddressTransformationTest extends TestCase
 
         $orderItems = collect([]);
 
-        $reflection = new \ReflectionClass($this->controller);
-        $method = $reflection->getMethod("dpd_generare_awb");
-        $method->setAccessible(true);
+        // Mock the get_cities method to return a valid city ID
+        $controller = Mockery::mock(ComenziController::class)->makePartial()->shouldAllowMockingProtectedMethods();
+        $controller->shouldReceive('get_cities')
+                  ->with('B', 'Bucuresti')
+                  ->andReturn('1');
 
-        $result = $method->invoke($this->controller, $order, $orderItems);
+        $result = $controller->dpd_generare_awb($order, $orderItems);
 
         // When CIF is present, company name should be used
         $this->assertEquals("Test Company SRL", $result["recipient"]["clientName"]);
@@ -261,13 +271,21 @@ class DpdAddressTransformationTest extends TestCase
 
         $orderItems = collect([]);
 
-        $reflection = new \ReflectionClass($this->controller);
-        $method = $reflection->getMethod("dpd_generare_awb");
-        $method->setAccessible(true);
+        // Mock the get_cities method to return a valid city ID
+        $controller = Mockery::mock(ComenziController::class)->makePartial()->shouldAllowMockingProtectedMethods();
+        $controller->shouldReceive('get_cities')
+                  ->with('B', 'Bucuresti')
+                  ->andReturn('1');
 
-        $result = $method->invoke($this->controller, $order, $orderItems);
+        $result = $controller->dpd_generare_awb($order, $orderItems);
 
         // For netopia payments, COD amount should be 0
         $this->assertEquals(0, $result["service"]["additionalServices"]["cod"]["amount"]);
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
     }
 }

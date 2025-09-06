@@ -461,7 +461,7 @@ class ComenziController extends Controller
         return $errors;
     }
 
-    private function dpd_generare_awb($order, $order_item)
+    protected function dpd_generare_awb($order, $order_item)
     {
         $state_id = $this->get_cities($order->state, $order->city);
 
@@ -534,7 +534,7 @@ class ComenziController extends Controller
         return $array;
     }
 
-    private function dpd_make_call($array)
+    public function dpd_make_call($array)
     {
         $base_url = "https://api.dpd.ro/v1/shipment";
 
@@ -774,7 +774,7 @@ class ComenziController extends Controller
     //     curl_close($ch);
     //     return $response;
     // }
-    private function get_cities($judet, $city)
+    protected function get_cities($judet, $city)
     {
         try {
             // Check if judete.txt file exists
